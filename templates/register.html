@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Account - Diabetes Risk Prediction System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="auth-page-container">
+    <div class="auth-box">
+        
+        <div class="auth-header">
+            <div class="auth-logo-badge">📝</div>
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-sub">Biomedical Engineering Project</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div>
+                    {% for category, message in messages %}
+                        <div class="alert-box alert-{{ category if category != 'message' else 'info' }}">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('register') }}" method="POST" class="auth-form-body">
+            
+            <div class="form-field">
+                <label for="username">Choose Username</label>
+                <input type="text" id="username" name="username" placeholder="e.g. akash, prasanth" required autofocus>
+            </div>
+
+            <div class="form-field">
+                <label for="password">Create Password</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                    <input type="password" id="password" name="password" placeholder="Enter password" required minlength="3" style="width: 100%; padding-right: 42px;">
+                    <button type="button" onclick="togglePasswordVisibility('password', this)" 
+                            style="position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted);" 
+                            title="Show/Hide Password">
+                        👁️
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary-teal" style="width: 100%; justify-content: center; margin-top: 8px;">
+                Register & Enter System
+            </button>
+
+        </form>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color); font-size: 0.9rem; color: var(--text-secondary);">
+            Already have an account? 
+            <a href="{{ url_for('login') }}" style="color: var(--teal-primary); font-weight: 700; text-decoration: none;">
+                Sign In Here
+            </a>
+        </div>
+
+    </div>
+
+    <div style="margin-top: 20px; font-size: 0.82rem; color: var(--text-muted); text-align: center;">
+        B.E. Biomedical Engineering • Secure Clinical Healthcare Platform
+    </div>
+</div>
+
+<script>
+function togglePasswordVisibility(fieldId, btn) {
+    const field = document.getElementById(fieldId);
+    if (field.type === "password") {
+        field.type = "text";
+        btn.textContent = "🙈";
+    } else {
+        field.type = "password";
+        btn.textContent = "👁️";
+    }
+}
+</script>
+
+</body>
+</html>

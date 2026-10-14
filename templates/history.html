@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Prediction History{% endblock %}
+
+{% block content %}
+<div class="view-header">
+    <h2 class="view-title">
+        <span style="color: var(--teal-primary);">🕒</span>
+        <span>Prediction History</span>
+    </h2>
+    <p class="view-subtitle">Historical log of patient assessments recorded in the SQLite database.</p>
+</div>
+
+<!-- FILTER & SEARCH BAR -->
+<div class="filter-bar">
+    <div class="search-box-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="patientSearchInput" class="search-input" 
+               placeholder="Search patient ID or name..." onkeyup="filterHistoryTable()">
+    </div>
+
+    <div class="filter-dropdown-wrapper">
+        <span style="color: var(--text-muted); font-size: 1rem;">⚚</span>
+        <select id="riskFilterSelect" class="filter-select" onchange="filterHistoryTable()">
+            <option value="ALL">All Risk Levels</option>
+            <option value="High Risk">High Risk</option>
+            <option value="Medium Risk">Medium Risk</option>
+            <option value="Low Risk">Low Risk</option>
+        </select>
+    </div>
+</div>
+
+<!-- TABLE CARD -->
+<div class="table-card">
+    <div style="overflow-x: auto;">
+        <table class="clinical-table" id="historyTable">
+            <thead>
+                <tr>
+                    <th>Patient ID / Subject</th>
+                    <th>Date</th>
+                    <th>Risk Level</th>
+                    <th>Probability</th>
+                    <th>Historical Comparison</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in records %}
+                <tr class="history-row" 
+                    data-patient="{{ item.patient_name|lower }}" 
+                    data-risk="{{ item.risk_level }}">
+                    
+                    <td style="font-weight: 600; color: #ffffff;">{{ item.patient_name }}</td>
+                    <td style="color: var(--text-secondary); font-size: 0.88rem;">{{ item.date }}</td>
+                    
+                    <td>
+                        {% if "High" in item.risk_level %}
+                            <span class="risk-pill high">{{ item.risk_level }}</span>
+                        {% elif "Low" in item.risk_level %}
+                            <span class="risk-pill low">{{ item.risk_level }}</span>
+                        {% else %}
+                            <span class="risk-pill medium">{{ item.risk_level }}</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td style="font-weight: 700; color: #ffffff;">{{ item.probability }}</td>
+                    
+                    <td class="comparison-text">
+                        {{ item.comparison }}
+                    </td>
+                    
+                    <td>
+                        <button type="button" class="action-link" style="background: none; border: none; cursor: pointer;"
+                                onclick="openReportModal('{{ item.patient_name }}', '{{ item.date }}', '{{ item.risk_level }}', '{{ item.probability }}', '{{ item.glucose }}', '{{ item.blood_pressure }}', '{{ item.bmi }}', '{{ item.insulin }}', '{{ item.age }}')">
+                            <span>📄 View Report</span>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+                        <div style="font-weight: 700; color: #ffffff; font-size: 1.05rem;">No prediction history available</div>
+                        <p style="font-size: 0.85rem; margin-top: 4px;">You have not performed any patient assessments yet. Perform a prediction to see your records here.</p>
+                        <a href="{{ url_for('prediction_page') }}" class="btn-primary-teal" style="display: inline-flex; margin-top: 14px; font-size: 0.85rem; padding: 8px 18px;">
+                            ⚡ Run First Prediction
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- PATIENT REPORT MODAL -->
+<div id="reportModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 2000; align-items: center; justify-content: center;">
+    <div style="background: #0d172b; border: 1px solid var(--border-color); border-radius: 16px; width: 90%; max-width: 550px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🩺</span>
+                <h3 id="modalPatientTitle" style="font-size: 1.25rem; font-weight: 700; color: #ffffff;">Patient Assessment Report</h3>
+            </div>
+            <button type="button" onclick="closeReportModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer;">✕</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px; background: #080e1e; padding: 14px 18px; border-radius: 10px; border: 1px solid var(--border-color);">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Assessment Date</div>
+                <div id="modalDate" style="font-size: 0.95rem; font-weight: 600; color: #ffffff;">-</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Risk Score</div>
+                <div id="modalRiskBadge" style="font-size: 1.1rem; font-weight: 700;">-</div>
+            </div>
+        </div>
+
+        <h4 style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal-primary); margin-bottom: 12px;">Biometric Parameters</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+            <div style="background: #080e1e; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Glucose Level</div>
+                <div id="modalGlucose" style="font-size: 1rem; font-weight: 700; color: #ffffff;">-</div>
+            </div>
+            <div style="background: #080e1e; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Blood Pressure</div>
+                <div id="modalBP" style="font-size: 1rem; font-weight: 700; color: #ffffff;">-</div>
+            </div>
+            <div style="background: #080e1e; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Body Mass Index (BMI)</div>
+                <div id="modalBMI" style="font-size: 1rem; font-weight: 700; color: #ffffff;">-</div>
+            </div>
+            <div style="background: #080e1e; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Insulin (2h serum)</div>
+                <div id="modalInsulin" style="font-size: 1rem; font-weight: 700; color: #ffffff;">-</div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" onclick="closeReportModal()" class="btn-chip" style="padding: 9px 18px;">Close</button>
+            <a href="{{ url_for('prediction_page') }}" class="btn-primary-teal" style="padding: 9px 20px; font-size: 0.9rem;">
+                ⚡ New Assessment
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterHistoryTable() {
+    const searchVal = document.getElementById("patientSearchInput").value.toLowerCase();
+    const riskVal = document.getElementById("riskFilterSelect").value;
+    const rows = document.querySelectorAll(".history-row");
+
+    rows.forEach(row => {
+        const patientName = row.getAttribute("data-patient") || "";
+        const riskLevel = row.getAttribute("data-risk") || "";
+
+        const matchesSearch = patientName.includes(searchVal);
+        const matchesRisk = (riskVal === "ALL" || riskLevel.includes(riskVal));
+
+        if (matchesSearch && matchesRisk) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
+
+function openReportModal(patient, date, risk, prob, gluc, bp, bmi, ins, age) {
+    document.getElementById("modalPatientTitle").textContent = "Patient: " + patient;
+    document.getElementById("modalDate").textContent = date;
+    
+    const badge = document.getElementById("modalRiskBadge");
+    badge.textContent = prob + " (" + risk + ")";
+    if (risk.includes("High")) {
+        badge.style.color = "#ef4444";
+    } else if (risk.includes("Medium")) {
+        badge.style.color = "#00c49f";
+    } else {
+        badge.style.color = "#3b82f6";
+    }
+
+    document.getElementById("modalGlucose").textContent = gluc + " mg/dL";
+    document.getElementById("modalBP").textContent = bp + " mmHg";
+    document.getElementById("modalBMI").textContent = bmi + " kg/m²";
+    document.getElementById("modalInsulin").textContent = ins + " μU/mL";
+
+    const modal = document.getElementById("reportModal");
+    modal.style.display = "flex";
+}
+
+function closeReportModal() {
+    document.getElementById("reportModal").style.display = "none";
+}
+</script>
+{% endblock %}

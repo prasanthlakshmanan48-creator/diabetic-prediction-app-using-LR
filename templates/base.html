@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Diabetes Risk Prediction System{% endblock %} - Biomedical Engineering</title>
+    
+    <!-- Design System CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <!-- Chart.js for High-Performance Clinical Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <!-- TOP HEADER BAR -->
+    <header class="app-header">
+        <a href="{{ url_for('prediction_page') }}" class="brand-section">
+            <div class="brand-icon-box">🩺</div>
+            <div class="brand-text">
+                <h1>Diabetes Risk Prediction System</h1>
+                <p>Biomedical Engineering Project</p>
+            </div>
+        </a>
+
+        <div class="header-actions">
+            <div class="user-status">
+                Logged in as <strong>{{ session.username or username or 'akash' }}</strong>
+            </div>
+
+            <a href="{{ url_for('logout') }}" class="btn-header-logout" title="Sign out of system">
+                <span>↳ Logout</span>
+            </a>
+
+            <button type="button" class="theme-toggle-btn" title="Toggle theme mode" id="theme-toggle">
+                <span>☀️</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN BODY WRAPPER (SIDEBAR + CONTENT) -->
+    <div class="app-body">
+        
+        <!-- LEFT SIDEBAR NAVIGATION -->
+        <aside class="sidebar">
+            <div>
+                <div class="nav-group-title">NAVIGATION</div>
+                <nav class="sidebar-menu">
+                    
+                    <a href="{{ url_for('dashboard_page') }}" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                        <span class="nav-icon">⊞</span>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a href="{{ url_for('prediction_page') }}" class="nav-item {% if active_page == 'prediction' %}active{% endif %}">
+                        <span class="nav-icon">🩺</span>
+                        <span>Prediction</span>
+                    </a>
+
+                    <a href="{{ url_for('reports_page') }}" class="nav-item {% if active_page == 'reports' %}active{% endif %}">
+                        <span class="nav-icon">📄</span>
+                        <span>Reports</span>
+                    </a>
+
+                    <a href="{{ url_for('history_page') }}" class="nav-item {% if active_page == 'history' %}active{% endif %}">
+                        <span class="nav-icon">🕒</span>
+                        <span>History</span>
+                    </a>
+
+                    <a href="{{ url_for('settings_page') }}" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+                        <span class="nav-icon">⚙️</span>
+                        <span>Settings</span>
+                    </a>
+
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-sidebar-logout">
+                    <span>↳ Logout</span>
+                </a>
+                <div class="sidebar-dept-tag">B.E. Biomedical Engineering</div>
+            </div>
+        </aside>
+
+        <!-- CONTENT AREA -->
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+
+    <!-- Application Script -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+</body>
+</html>

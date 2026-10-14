@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings{% endblock %}
+
+{% block content %}
+<div class="view-header">
+    <h2 class="view-title">
+        <span style="color: var(--teal-primary);">⚙️</span>
+        <span>System Configuration & Project Details</span>
+    </h2>
+    <p class="view-subtitle">Undergraduate Biomedical Engineering Project Specifications & ML Architecture.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
+    
+    <!-- Model Architecture Card -->
+    <div class="form-panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>🤖</span>
+                <span>Machine Learning Architecture</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px; font-size: 0.92rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Classifier Algorithm</span>
+                <strong style="color: var(--teal-primary);">Random Forest Classifier (Ensemble)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Preprocessor</span>
+                <strong style="color: #ffffff;">StandardScaler Normalization</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Biometric Feature Count</span>
+                <strong style="color: #ffffff;">8 Diagnostic Parameters</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Training Population</span>
+                <strong style="color: #ffffff;">Pima Indians Diabetes Dataset</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Visual Engines</span>
+                <strong style="color: #3b82f6;">Chart.js (Interactive) + Matplotlib (Rendered)</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project & Account Details Card -->
+    <div class="form-panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>🎓</span>
+                <span>Department & User Account</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px; font-size: 0.92rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Active Session User</span>
+                <strong style="color: var(--teal-primary);">{{ session.username or username }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Academic Degree</span>
+                <strong style="color: #ffffff;">B.E. Biomedical Engineering</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Database Engine</span>
+                <strong style="color: #ffffff;">SQLite Local Engine (diabetes.db)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <span style="color: var(--text-muted);">Backend Framework</span>
+                <strong style="color: #ffffff;">Python Flask + SQLAlchemy</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Authentication State</span>
+                <span class="risk-pill medium" style="font-size: 0.78rem;">Verified Session</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Diabetes Risk Prediction & Clinical Visualizer</title>
+    <meta name="description" content="Intelligent machine learning system for diabetes risk prediction with interactive comparative charts and medical analytics.">
+    
+    <!-- Design System CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <!-- Chart.js for High-Performance Interactive Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="{{ url_for('home') }}" class="brand">
+            <div class="brand-icon">🩺</div>
+            <div class="brand-title">Diab<span>Predict</span> AI</div>
+        </a>
+
+        <div class="nav-menu">
+            {% if logged_in %}
+                <span class="nav-badge"><span class="dot"></span> Logged in as <strong>{{ username }}</strong></span>
+                <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard & History</a>
+                <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link">Sign In</a>
+                <a href="{{ url_for('register') }}" class="btn-primary">Register Free</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<!-- Main Container -->
+<main class="main-content">
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-pill">⚡ Machine Learning Health Intelligence</div>
+        <h1 class="hero-title">Early Diabetes Risk <span class="gradient-text">Prediction & Analytics</span></h1>
+        <p class="hero-subtitle">
+            Enter clinical biometric parameters below to receive an instant ML assessment, probability scoring, and comprehensive comparative benchmark graphs.
+        </p>
+
+        <!-- Quick Fill Sample Presets for Testing -->
+        <div class="sample-presets">
+            <span style="font-size: 0.85rem; color: var(--text-muted); align-self: center;">Quick test samples:</span>
+            <button type="button" id="fill-normal-btn" class="btn-chip">
+                🟢 Load Normal Health Sample
+            </button>
+            <button type="button" id="fill-highrisk-btn" class="btn-chip">
+                🔴 Load Elevated Risk Sample
+            </button>
+        </div>
+    </section>
+
+    <!-- Flash Notifications -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert-container">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'message' else 'info' }}">
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Clinical Input Form Card -->
+    <div class="form-card">
+        <div class="card-header-bar">
+            <div class="card-title">
+                <span class="icon">📋</span>
+                <span>Patient Biometric Parameters</span>
+            </div>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">All 8 metrics are required for accurate analysis</span>
+        </div>
+
+        <form action="{{ url_for('predict') }}" method="POST" class="prediction-form">
+            <div class="form-grid">
+                
+                <!-- Pregnancies -->
+                <div class="input-field">
+                    <label for="pregnancies">
+                        <span>Pregnancies</span>
+                        <span class="hint">Count</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="pregnancies" name="pregnancies" min="0" max="25" step="1" 
+                               value="{{ user_inputs.Pregnancies if user_inputs else '0' }}" required>
+                    </div>
+                </div>
+
+                <!-- Glucose -->
+                <div class="input-field">
+                    <label for="glucose">
+                        <span>Glucose</span>
+                        <span class="hint">Normal: 70–99 mg/dL</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="glucose" name="glucose" min="0" max="400" step="1" 
+                               value="{{ user_inputs.Glucose if user_inputs else '115' }}" required>
+                    </div>
+                </div>
+
+                <!-- Blood Pressure -->
+                <div class="input-field">
+                    <label for="blood_pressure">
+                        <span>Blood Pressure</span>
+                        <span class="hint">Diastolic (mmHg)</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="blood_pressure" name="blood_pressure" min="0" max="200" step="1" 
+                               value="{{ user_inputs.BloodPressure if user_inputs else '72' }}" required>
+                    </div>
+                </div>
+
+                <!-- Skin Thickness -->
+                <div class="input-field">
+                    <label for="skin_thickness">
+                        <span>Skin Thickness</span>
+                        <span class="hint">Triceps fold (mm)</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="skin_thickness" name="skin_thickness" min="0" max="100" step="1" 
+                               value="{{ user_inputs.SkinThickness if user_inputs else '20' }}" required>
+                    </div>
+                </div>
+
+                <!-- Insulin -->
+                <div class="input-field">
+                    <label for="insulin">
+                        <span>Serum Insulin</span>
+                        <span class="hint">2-Hour (μU/mL)</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="insulin" name="insulin" min="0" max="900" step="1" 
+                               value="{{ user_inputs.Insulin if user_inputs else '85' }}" required>
+                    </div>
+                </div>
+
+                <!-- BMI -->
+                <div class="input-field">
+                    <label for="bmi">
+                        <span>BMI</span>
+                        <span class="hint">Normal: 18.5–24.9</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="bmi" name="bmi" min="0" max="70" step="0.1" 
+                               value="{{ user_inputs.BMI if user_inputs else '26.5' }}" required>
+                    </div>
+                </div>
+
+                <!-- Diabetes Pedigree Function -->
+                <div class="input-field">
+                    <label for="diabetes_pedigree">
+                        <span>Pedigree Function</span>
+                        <span class="hint">Genetic history score</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="diabetes_pedigree" name="diabetes_pedigree" min="0" max="3" step="0.001" 
+                               value="{{ user_inputs.DiabetesPedigreeFunction if user_inputs else '0.45' }}" required>
+                    </div>
+                </div>
+
+                <!-- Age -->
+                <div class="input-field">
+                    <label for="age">
+                        <span>Age</span>
+                        <span class="hint">Years</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="age" name="age" min="1" max="120" step="1" 
+                               value="{{ user_inputs.Age if user_inputs else '32' }}" required>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-submit" id="predict-btn">
+                    <span>⚡ Run Prediction & Generate Graphs</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- PREDICTION RESULTS & GRAPH VISUALIZATIONS -->
+    {% if result %}
+    <section class="result-section" id="results">
+        
+        <!-- Grand Result Banner -->
+        <div class="result-banner {{ risk_class }}">
+            <div class="banner-content">
+                <div class="result-badge-icon">
+                    {% if risk_class == 'danger' %}⚠️{% else %}✅{% endif %}
+                </div>
+                <div class="banner-text">
+                    <h2>{{ result }}</h2>
+                    <p>
+                        {% if risk_class == 'danger' %}
+                            The machine learning model identified an elevated likelihood of diabetes based on the biometric metrics provided.
+                        {% else %}
+                            Biometric indicators show favorable readings with low estimated risk of diabetes onset.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="banner-stats">
+                <div class="stat-label">Estimated Risk Score</div>
+                <div class="stat-value">{{ probability }}%</div>
+            </div>
+        </div>
+
+        <!-- Interactive Charts Grid (Chart.js) -->
+        <div class="graphs-grid">
+            
+            <!-- Graph 1: Risk Probability Gauge -->
+            <div class="graph-card">
+                <div class="graph-header">
+                    <div>
+                        <div class="graph-title">🎯 Risk Probability Gauge</div>
+                        <div class="graph-desc">Visual probability meter calibrated against 0–100% risk</div>
+                    </div>
+                </div>
+
+                <div class="chart-container-gauge">
+                    <canvas id="riskGaugeChart"></canvas>
+                    <div class="gauge-center-label">
+                        <div class="gauge-prob-number">{{ probability }}%</div>
+                        <div class="gauge-prob-tag" style="color: {% if probability >= 70 %}#ef4444{% elif probability >= 40 %}#f59e0b{% else %}#10b981{% endif %};">
+                            {% if probability >= 70 %}High Risk{% elif probability >= 40 %}Moderate Risk{% else %}Low Risk{% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 0.8rem; font-weight: 600;">
+                    <span style="color: #10b981;">● Low (&lt;40%)</span>
+                    <span style="color: #f59e0b;">● Moderate (40–70%)</span>
+                    <span style="color: #ef4444;">● High (≥70%)</span>
+                </div>
+            </div>
+
+            <!-- Graph 2: Metrics Benchmark Comparison Bar Chart -->
+            <div class="graph-card">
+                <div class="graph-header">
+                    <div>
+                        <div class="graph-title">📊 Patient vs Population Benchmarks</div>
+                        <div class="graph-desc">Interactive comparison against Healthy vs Diabetic population means</div>
+                    </div>
+                </div>
+
+                <div class="chart-container-bar">
+                    <canvas id="benchmarkBarChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Graph 3: Model Feature Importance Breakdown -->
+        {% if feature_importances %}
+        <div class="feature-impact-card">
+            <div class="graph-header">
+                <div>
+                    <div class="graph-title">🔬 Machine Learning Feature Importance</div>
+                    <div class="graph-desc">How heavily each biometric parameter influences diabetes classification</div>
+                </div>
+            </div>
+
+            <div class="importance-bars-list">
+                {% for feat, weight in feature_importances.items() %}
+                <div class="importance-item">
+                    <div class="importance-meta">
+                        <span>{{ feat }}</span>
+                        <span>{{ weight }}% importance</span>
+                    </div>
+                    <div class="importance-track">
+                        <div class="importance-fill" style="width: {{ weight * 3 }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Graph 4: Dual-Panel Matplotlib Graphic (Server-Side Rendered & Downloadable) -->
+        {% if graph_base64 %}
+        <div class="matplotlib-report-card">
+            <div class="report-header">
+                <div>
+                    <div class="graph-title">📈 Clinical Assessment Graphic (Matplotlib Engine)</div>
+                    <div class="graph-desc">Publication-ready composite figure with high-resolution export</div>
+                </div>
+                <button type="button" class="btn-secondary" id="download-graph-btn">
+                    📥 Download Chart (.PNG)
+                </button>
+            </div>
+
+            <div class="matplotlib-image-wrapper">
+                <img id="matplotlib-chart-img" 
+                     src="data:image/png;base64,{{ graph_base64 }}" 
+                     alt="Diabetes Clinical Assessment Chart (Matplotlib)">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Clinical Insights & Recommendations -->
+        {% if insights %}
+        <div class="insights-grid">
+            {% for item in insights %}
+            <div class="insight-card {{ item.level }}">
+                <div class="insight-icon">
+                    {% if item.level == 'healthy' %}🟢{% elif item.level == 'warning' %}🟡{% else %}🔴{% endif %}
+                </div>
+                <div class="insight-body">
+                    <h4>{{ item.title }}</h4>
+                    <p>{{ item.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Clinical Disclaimer -->
+        <div class="disclaimer-card">
+            ⚠️ <strong>Medical Disclaimer:</strong> This application is powered by an AI statistical classifier trained on historical clinical datasets. It is designed to assist educational and risk-screening workflows and should not be used as an independent clinical diagnosis. Always consult certified healthcare professionals for comprehensive evaluation.
+        </div>
+
+    </section>
+    {% endif %}
+
+</main>
+
+<!-- Footer -->
+<footer class="app-footer">
+    <p>DiabPredict AI • Intelligent Diabetes Risk Prediction & Analytics System • Built with Python, Flask, Scikit-Learn & Chart.js</p>
+</footer>
+
+<!-- Pass Data to JavaScript for Chart.js rendering -->
+{% if result %}
+<script>
+    window.predictionData = {
+        probability: {{ probability }},
+        labels: {{ comparison_labels|tojson }},
+        userVals: {{ chart_user_vals|tojson }},
+        healthyVals: {{ chart_healthy_vals|tojson }},
+        diabeticVals: {{ chart_diabetic_vals|tojson }}
+    };
+</script>
+{% endif %}
+
+<!-- Application JS -->
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

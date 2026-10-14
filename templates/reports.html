@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Clinical Reports{% endblock %}
+
+{% block content %}
+<div class="view-header">
+    <h2 class="view-title">
+        <span style="color: var(--teal-primary);">📄</span>
+        <span>Diagnostic Reports & Documentation</span>
+    </h2>
+    <p class="view-subtitle">Generate, inspect, and export clinical evaluation summaries for patient archives.</p>
+</div>
+
+<div class="table-card" style="margin-bottom: 28px;">
+    <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">Exportable Patient Assessments ({{ records|length }})</h3>
+        <button type="button" class="btn-chip" onclick="window.print()" style="color: var(--teal-primary); border-color: var(--teal-border);">
+            🖨️ Print / Save All Reports (PDF)
+        </button>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="clinical-table">
+            <thead>
+                <tr>
+                    <th>Report Ref</th>
+                    <th>Patient Name</th>
+                    <th>Evaluation Date</th>
+                    <th>Risk Category</th>
+                    <th>Probability</th>
+                    <th>Clinical Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td style="font-weight: 700; color: var(--teal-primary);">REP-2026-{{ "%03d"|format(r.id) }}</td>
+                    <td style="font-weight: 600; color: #ffffff;">{{ r.patient_name }}</td>
+                    <td style="color: var(--text-secondary); font-size: 0.85rem;">{{ r.created_at }}</td>
+                    <td>
+                        {% if "High" in r.prediction %}
+                            <span class="risk-pill high">{{ r.prediction }}</span>
+                        {% elif "Low" in r.prediction %}
+                            <span class="risk-pill low">{{ r.prediction }}</span>
+                        {% else %}
+                            <span class="risk-pill medium">{{ r.prediction }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 700; color: #ffffff;">{{ "%.1f"|format(r.probability) }}%</td>
+                    <td>
+                        <button type="button" class="action-link" style="background: none; border: none; cursor: pointer;"
+                                onclick="alert('Report Reference REP-2026-{{ '%03d'|format(r.id) }} for {{ r.patient_name }} ready for export.')">
+                            <span>📥 Export PDF</span>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">📄</div>
+                        <div style="font-weight: 700; color: #ffffff; font-size: 1.05rem;">No assessment reports available</div>
+                        <p style="font-size: 0.85rem; margin-top: 4px;">Run a patient prediction to generate and view clinical assessment reports.</p>
+                        <a href="{{ url_for('prediction_page') }}" class="btn-primary-teal" style="display: inline-flex; margin-top: 14px; font-size: 0.85rem; padding: 8px 18px;">
+                            ⚡ Run First Prediction
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

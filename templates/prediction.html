@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Biometric Risk Prediction{% endblock %}
+
+{% block content %}
+<div class="view-header">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <h2 class="view-title">
+                <span style="color: var(--teal-primary);">🩺</span>
+                <span>Clinical Diabetes Risk Assessment</span>
+            </h2>
+            <p class="view-subtitle">Input patient biometric parameters for Random Forest predictive evaluation and visual benchmarks.</p>
+        </div>
+
+        <!-- Presets -->
+        <div class="preset-pills">
+            <button type="button" id="fill-normal-btn" class="btn-chip">
+                🟢 Load Normal Health Sample
+            </button>
+            <button type="button" id="fill-highrisk-btn" class="btn-chip">
+                🔴 Load Elevated Risk Sample
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Flash Notifications -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div style="margin-bottom: 20px;">
+            {% for category, message in messages %}
+                <div class="alert-box alert-{{ category if category != 'message' else 'info' }}">
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<!-- INPUT FORM PANEL -->
+<div class="form-panel">
+    <div class="panel-header">
+        <div class="panel-title">
+            <span>📋</span>
+            <span>Biometric Input Parameters</span>
+        </div>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Trained on clinical diabetes population dataset</span>
+    </div>
+
+    <form action="{{ url_for('prediction_page') }}" method="POST" class="prediction-form">
+        
+        <!-- Patient Identifier -->
+        <div style="margin-bottom: 20px; max-width: 400px;">
+            <div class="form-field">
+                <label for="patient_name">
+                    <span>Patient Identifier / Subject Name</span>
+                    <span class="hint">e.g. Patient #1, prasa</span>
+                </label>
+                <input type="text" id="patient_name" name="patient_name" 
+                       value="{{ user_inputs.patient_name if user_inputs.patient_name else patient_name }}" 
+                       placeholder="e.g. Patient #1" required>
+            </div>
+        </div>
+
+        <div class="grid-inputs">
+            
+            <!-- Pregnancies -->
+            <div class="form-field">
+                <label for="pregnancies">
+                    <span>Pregnancies</span>
+                    <span class="hint">Count</span>
+                </label>
+                <input type="number" id="pregnancies" name="pregnancies" min="0" max="25" step="1" 
+                       value="{{ user_inputs.Pregnancies if user_inputs else '1' }}" required>
+            </div>
+
+            <!-- Glucose -->
+            <div class="form-field">
+                <label for="glucose">
+                    <span>Fasting Glucose</span>
+                    <span class="hint">Normal: 70–99 mg/dL</span>
+                </label>
+                <input type="number" id="glucose" name="glucose" min="0" max="400" step="1" 
+                       value="{{ user_inputs.Glucose if user_inputs else '115' }}" required>
+            </div>
+
+            <!-- Blood Pressure -->
+            <div class="form-field">
+                <label for="blood_pressure">
+                    <span>Blood Pressure</span>
+                    <span class="hint">Diastolic (mmHg)</span>
+                </label>
+                <input type="number" id="blood_pressure" name="blood_pressure" min="0" max="200" step="1" 
+                       value="{{ user_inputs.BloodPressure if user_inputs else '72' }}" required>
+            </div>
+
+            <!-- Skin Thickness -->
+            <div class="form-field">
+                <label for="skin_thickness">
+                    <span>Skin Thickness</span>
+                    <span class="hint">Triceps fold (mm)</span>
+                </label>
+                <input type="number" id="skin_thickness" name="skin_thickness" min="0" max="100" step="1" 
+                       value="{{ user_inputs.SkinThickness if user_inputs else '22' }}" required>
+            </div>
+
+            <!-- Insulin -->
+            <div class="form-field">
+                <label for="insulin">
+                    <span>Serum Insulin</span>
+                    <span class="hint">2-Hour (μU/mL)</span>
+                </label>
+                <input type="number" id="insulin" name="insulin" min="0" max="900" step="1" 
+                       value="{{ user_inputs.Insulin if user_inputs else '80' }}" required>
+            </div>
+
+            <!-- BMI -->
+            <div class="form-field">
+                <label for="bmi">
+                    <span>Body Mass Index</span>
+                    <span class="hint">Normal: 18.5–24.9</span>
+                </label>
+                <input type="number" id="bmi" name="bmi" min="0" max="70" step="0.1" 
+                       value="{{ user_inputs.BMI if user_inputs else '27.4' }}" required>
+            </div>
+
+            <!-- Pedigree Function -->
+            <div class="form-field">
+                <label for="diabetes_pedigree">
+                    <span>Pedigree Function</span>
+                    <span class="hint">Genetic score</span>
+                </label>
+                <input type="number" id="diabetes_pedigree" name="diabetes_pedigree" min="0" max="3" step="0.001" 
+                       value="{{ user_inputs.DiabetesPedigreeFunction if user_inputs else '0.38' }}" required>
+            </div>
+
+            <!-- Age -->
+            <div class="form-field">
+                <label for="age">
+                    <span>Patient Age</span>
+                    <span class="hint">Years</span>
+                </label>
+                <input type="number" id="age" name="age" min="1" max="120" step="1" 
+                       value="{{ user_inputs.Age if user_inputs else '34' }}" required>
+            </div>
+
+        </div>
+
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn-primary-teal" id="predict-btn">
+                <span>⚡ Run Prediction & Generate Graphs</span>
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<!-- GRAPHICAL OUTPUTS SECTION (WHEN PREDICTION RESULT EXISTS) -->
+{% if result %}
+<section id="resultsSection" style="margin-top: 36px; animation: fadeIn 0.4s ease-out;">
+    
+    <!-- RESULT SUMMARY BANNER -->
+    <div style="background: var(--bg-card); border: 1.5px solid {% if risk_class == 'danger' %}var(--danger-border){% elif risk_class == 'warning' %}var(--warning-border){% else %}var(--teal-border){% endif %}; border-radius: var(--radius-lg); padding: 24px 28px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <div style="width: 54px; height: 54px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; background: {% if risk_class == 'danger' %}var(--danger-bg){% else %}var(--teal-glow){% endif %}; color: {% if risk_class == 'danger' %}#f87171{% else %}var(--teal-primary){% endif %};">
+                {% if risk_class == 'danger' %}⚠️{% else %}✅{% endif %}
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Assessment For: {{ patient_name }}</div>
+                <h3 style="font-size: 1.6rem; font-weight: 800; color: #ffffff; line-height: 1.2;">{{ result }}</h3>
+                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 4px;">Recorded in SQLite database history with longitudinal comparative tracking.</p>
+            </div>
+        </div>
+
+        <div style="background: #080e1e; border: 1px solid var(--border-color); padding: 12px 24px; border-radius: var(--radius-md); text-align: right;">
+            <div style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Predicted Probability</div>
+            <div style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 800; color: {% if probability >= 70 %}#ef4444{% elif probability >= 40 %}#00c49f{% else %}#3b82f6{% endif %};">
+                {{ probability }}%
+            </div>
+        </div>
+    </div>
+
+    <!-- DUAL INTERACTIVE CHARTS ROW (CHART.JS) -->
+    <div class="graphs-row">
+        
+        <!-- Graph 1: Risk Probability Gauge -->
+        <div class="graph-box">
+            <div class="graph-box-header">
+                <div>
+                    <div class="graph-box-title">🎯 Risk Probability Gauge</div>
+                    <div class="graph-box-sub">Calibrated dynamic risk dial (0–100%)</div>
+                </div>
+            </div>
+
+            <div class="gauge-holder">
+                <canvas id="riskGaugeChart"></canvas>
+                <div class="gauge-inner-label">
+                    <div class="gauge-num">{{ probability }}%</div>
+                    <div class="gauge-tag" style="color: {% if probability >= 70 %}#ef4444{% elif probability >= 40 %}#00c49f{% else %}#3b82f6{% endif %};">
+                        {{ result }}
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 0.8rem; font-weight: 600;">
+                <span style="color: #3b82f6;">● Low (&lt;40%)</span>
+                <span style="color: #00c49f;">● Medium (40–70%)</span>
+                <span style="color: #ef4444;">● High (≥70%)</span>
+            </div>
+        </div>
+
+        <!-- Graph 2: Patient vs Population Benchmarks Multi-Bar Chart -->
+        <div class="graph-box">
+            <div class="graph-box-header">
+                <div>
+                    <div class="graph-box-title">📊 Patient vs Population Benchmarks</div>
+                    <div class="graph-box-sub">Comparative metrics against Healthy vs Diabetic population means</div>
+                </div>
+            </div>
+
+            <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="benchmarkBarChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Graph 3: Feature Importance Breakdown -->
+    {% if feature_importances %}
+    <div class="form-panel" style="margin-bottom: 28px;">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">🔬 Random Forest Feature Importance</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">Weight contribution of each biometric indicator in classification</div>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+            {% for feat, weight in feature_importances.items() %}
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #cbd5e1;">
+                    <span>{{ feat }}</span>
+                    <span style="color: var(--teal-primary);">{{ weight }}%</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #080e1e; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div style="height: 100%; width: {{ weight * 3.5 }}%; border-radius: 999px; background: linear-gradient(90deg, #00c49f, #3b82f6);"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Graph 4: Dual-Panel Matplotlib Clinical Graphic (Downloadable PNG) -->
+    {% if graph_base64 %}
+    <div class="matplotlib-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <div class="graph-box-title">📈 Publication Diagnostic Graphic (Matplotlib Engine)</div>
+                <div class="graph-box-sub">Server-rendered composite visualization for clinical documentation</div>
+            </div>
+            <button type="button" class="btn-chip" id="download-graph-btn" style="border-color: var(--teal-border); color: var(--teal-primary);">
+                📥 Download Chart (.PNG)
+            </button>
+        </div>
+
+        <div class="matplotlib-img-wrap">
+            <img id="matplotlib-chart-img" 
+                 src="data:image/png;base64,{{ graph_base64 }}" 
+                 alt="Matplotlib Diagnostic Assessment Graphic">
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Clinical Insights -->
+    {% if insights %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 28px;">
+        {% for item in insights %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 4px solid {% if item.level == 'high' %}#ef4444{% elif item.level == 'warning' %}#f59e0b{% else %}#00c49f{% endif %}; border-radius: var(--radius-md); padding: 18px 20px;">
+            <h4 style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 4px;">{{ item.title }}</h4>
+            <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.45;">{{ item.message }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+    window.predictionData = {
+        probability: {{ probability }},
+        labels: {{ comparison_labels|tojson }},
+        userVals: {{ chart_user_vals|tojson }},
+        healthyVals: {{ chart_healthy_vals|tojson }},
+        diabeticVals: {{ chart_diabetic_vals|tojson }}
+    };
+</script>
+{% endif %}
+{% endblock %}
