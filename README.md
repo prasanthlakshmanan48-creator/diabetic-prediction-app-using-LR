@@ -1,0 +1,1 @@
+# diabetic-prediction-app-using-LR
