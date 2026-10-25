@@ -49,7 +49,7 @@
                     <td style="font-weight: 700; color: #ffffff;">{{ "%.1f"|format(r.probability) }}%</td>
                     <td>
                         <button type="button" class="action-link" style="background: none; border: none; cursor: pointer;"
-                                onclick="alert('Report Reference REP-2026-{{ '%03d'|format(r.id) }} for {{ r.patient_name }} ready for export.')">
+                                onclick="alert('Report Reference REP-2026-{{ r.id }} for {{ r.patient_name }} ready for export.')">
                             <span>📥 Export PDF</span>
                         </button>
                     </td>

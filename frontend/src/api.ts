@@ -91,5 +91,34 @@ export const api = {
     return authFetch("/api/user/me", {
       method: "GET",
     });
+  },
+
+  // 6. Native Authentication: Register
+  register: async (email: string, password: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Registration failed. Please try again.");
+    }
+    return res.json();
+  },
+
+  // 7. Native Authentication: Login
+  login: async (email: string, password: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Invalid email or password.");
+    }
+    return res.json();
   }
 };
+

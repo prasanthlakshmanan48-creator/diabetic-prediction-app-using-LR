@@ -3,10 +3,15 @@ import io
 import json
 import base64
 import joblib
+import uuid
+import time
+import hmac
+import hashlib
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from werkzeug.security import generate_password_hash, check_password_hash
 
 import matplotlib
 matplotlib.use("Agg")
@@ -16,7 +21,7 @@ from fastapi import FastAPI, Depends, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 # Firebase Admin SDK
@@ -45,14 +50,24 @@ Base = declarative_base()
 
 
 # =========================================================
-# DATABASE MODEL (WITH EXPLICIT user_uid)
+# DATABASE MODELS
 # =========================================================
+
+class UserAccount(Base):
+    __tablename__ = "user"
+
+    id = Column(Integer, primary_key=True, index=True)
+    uid = Column(String(128), unique=True, index=True, nullable=True)
+    username = Column(String(100), unique=True, nullable=True)
+    email = Column(String(128), unique=True, index=True, nullable=True)
+    password = Column(String(255), nullable=False)
+
 
 class PredictionRecord(Base):
     __tablename__ = "prediction"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_uid = Column(String(128), nullable=False, index=True)  # Authenticated Firebase UID
+    user_uid = Column(String(128), nullable=False, index=True)  # Authenticated Firebase UID or UserAccount UID
     username = Column(String(100), nullable=True)
     patient_name = Column(String(100), default="Patient #1")
     created_at = Column(String(50), default=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -75,6 +90,38 @@ class PredictionRecord(Base):
 
 
 Base.metadata.create_all(bind=engine)
+
+AUTH_SECRET = os.environ.get("SECRET_KEY", "diabetes-clinical-secret-key-2026")
+
+def generate_session_token(uid: str, email: str) -> str:
+    timestamp = int(time.time())
+    raw = f"{uid}|{email}|{timestamp}"
+    sig = hmac.new(AUTH_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    encoded = base64.urlsafe_b64encode(raw.encode()).decode()
+    return f"apptok.{encoded}.{sig}"
+
+def verify_session_token(token: str) -> Optional[Dict[str, str]]:
+    try:
+        parts = token.split(".")
+        if len(parts) != 3 or parts[0] != "apptok":
+            return None
+        encoded, sig = parts[1], parts[2]
+        raw = base64.urlsafe_b64decode(encoded.encode()).decode()
+        expected_sig = hmac.new(AUTH_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        uid, email, timestamp = raw.split("|")
+        # Token valid for 30 days
+        if int(time.time()) - int(timestamp) > 30 * 86400:
+            return None
+        return {
+            "uid": uid,
+            "email": email,
+            "name": email.split("@")[0] if "@" in email else uid
+        }
+    except Exception:
+        return None
+
 
 
 # =========================================================
@@ -216,7 +263,18 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
 
     token = parts[1]
 
-    # 1. Primary: Verify with Firebase Admin SDK
+    # 1. Native Secure Session Token (Built-in Auth)
+    if token.startswith("apptok."):
+        verified = verify_session_token(token)
+        if verified:
+            return verified
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Primary: Verify with Firebase Admin SDK
     if FIREBASE_INIT:
         try:
             decoded_token = firebase_auth.verify_id_token(token)
@@ -225,10 +283,9 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
             name = decoded_token.get("name", email.split("@")[0] if "@" in email else uid)
             return {"uid": uid, "email": email, "name": name}
         except Exception as err:
-            print("Firebase token verification error:", err)
-            # Proceed to dev token check if in testing mode
+            pass
 
-    # 2. Development & Testing Fallback
+    # 3. Development & Testing Fallback
     # Allows testing user isolation via custom token format "dev-token-<uid>" or testing tokens
     if token.startswith("dev-token-") or token.startswith("test-uid-"):
         test_uid = token.replace("dev-token-", "").replace("test-uid-", "")
@@ -241,7 +298,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
     # If verification failed and not a test token, reject with 401
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired Firebase ID token. Authorization denied.",
+        detail="Invalid authentication credentials. Please sign in.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -249,6 +306,16 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
 # =========================================================
 # PYDANTIC SCHEMAS
 # =========================================================
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+class AuthResponse(BaseModel):
+    token: str
+    user: Dict[str, Any]
+    message: str
+
 
 class PredictionRequest(BaseModel):
     patient_name: Optional[str] = Field("Patient #1", description="Patient identifier")
@@ -369,6 +436,79 @@ def health_check():
         "firebase_auth_active": FIREBASE_INIT,
         "database": "SQLite (diabetes.db)",
         "model_loaded": ml_model is not None
+    }
+
+
+# =========================================================
+# NATIVE AUTHENTICATION ENDPOINTS
+# =========================================================
+
+@app.post("/api/auth/register", response_model=AuthResponse)
+def register_user(req: AuthRequest, db: Session = Depends(get_db)):
+    email_clean = req.email.strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long.")
+
+    existing = db.query(UserAccount).filter(
+        (func.lower(UserAccount.email) == email_clean) |
+        (func.lower(UserAccount.username) == email_clean.split("@")[0])
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists. Please sign in.")
+
+    user_uid = f"usr_{uuid.uuid4().hex[:12]}"
+    username = email_clean.split("@")[0]
+    hashed_pwd = generate_password_hash(req.password)
+
+    new_user = UserAccount(
+        uid=user_uid,
+        username=username,
+        email=email_clean,
+        password=hashed_pwd
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = generate_session_token(user_uid, email_clean)
+    return {
+        "token": token,
+        "user": {
+            "uid": user_uid,
+            "email": email_clean,
+            "name": username
+        },
+        "message": "Account created successfully!"
+    }
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def login_user(req: AuthRequest, db: Session = Depends(get_db)):
+    email_clean = req.email.strip().lower()
+    user = db.query(UserAccount).filter(
+        (func.lower(UserAccount.email) == email_clean) |
+        (func.lower(UserAccount.username) == email_clean) |
+        (func.lower(UserAccount.username) == email_clean.split("@")[0])
+    ).first()
+
+    if not user or not check_password_hash(user.password, req.password):
+        raise HTTPException(status_code=401, detail="Invalid email or password. Please try again.")
+
+    if not user.uid:
+        user.uid = f"usr_{uuid.uuid4().hex[:12]}"
+        db.commit()
+
+    token = generate_session_token(user.uid, user.email or email_clean)
+    return {
+        "token": token,
+        "user": {
+            "uid": user.uid,
+            "email": user.email or email_clean,
+            "name": user.username or email_clean.split("@")[0]
+        },
+        "message": "Logged in successfully!"
     }
 
 

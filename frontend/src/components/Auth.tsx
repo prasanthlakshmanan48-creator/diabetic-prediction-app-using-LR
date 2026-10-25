@@ -1,18 +1,20 @@
 import React, { useState } from "react";
 import { 
-  signInWithEmailAndPassword, 
+  setAuthenticatedSession,
+  loginWithDemo,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   auth,
-  loginWithDemo,
   isFirebaseConfigured
 } from "../firebase";
+import { api } from "../api";
 
 export const Auth: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [showDemoPrompt, setShowDemoPrompt] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -20,26 +22,31 @@ export const Auth: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setShowDemoPrompt(false);
+    setSuccessMsg(null);
 
     const trimmedEmail = email.trim();
 
     try {
+      // 1. If Firebase is configured with real credentials, use Firebase
+      if (isFirebaseConfigured()) {
+        if (isRegister) {
+          await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        } else {
+          await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        }
+        return;
+      }
+
+      // 2. Primary: Full-Featured Native Database Authentication (FastAPI + SQLite/Postgres)
       if (isRegister) {
-        await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        const res = await api.register(trimmedEmail, password);
+        setAuthenticatedSession(res.token, res.user);
       } else {
-        await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        const res = await api.login(trimmedEmail, password);
+        setAuthenticatedSession(res.token, res.user);
       }
     } catch (err: any) {
-      const msg = err.message || "";
-      const code = err.code || "";
-
-      if (code === "auth/api-key-not-valid" || msg.includes("api-key-not-valid") || msg.includes("invalid-api-key") || !isFirebaseConfigured()) {
-        setError("Firebase API Key is not configured yet. You can enter instantly using Clinical Demo Mode (no Firebase account required).");
-        setShowDemoPrompt(true);
-      } else {
-        setError(msg || "Authentication failed. Please check your credentials.");
-      }
+      setError(err.message || "Authentication failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -62,31 +69,14 @@ export const Auth: React.FC = () => {
         </div>
 
         {error && (
-          <div className="alert-box alert-error" style={{ textAlign: "left" }}>
-            <div style={{ marginBottom: showDemoPrompt ? "10px" : "0" }}>{error}</div>
-            {showDemoPrompt && (
-              <button
-                type="button"
-                onClick={() => handleDemoLogin()}
-                style={{
-                  background: "#00c49f",
-                  color: "#080e1e",
-                  border: "none",
-                  padding: "8px 14px",
-                  borderRadius: "6px",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  width: "100%",
-                  justifyContent: "center"
-                }}
-              >
-                <span>🩺</span> Continue as {email || "Demo User"} (Clinical Demo Mode)
-              </button>
-            )}
+          <div className="alert-box alert-error" style={{ textAlign: "left", marginBottom: "16px" }}>
+            {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="alert-box alert-success" style={{ textAlign: "left", marginBottom: "16px", background: "rgba(0,196,159,0.15)", border: "1px solid #00c49f", color: "#00c49f" }}>
+            {successMsg}
           </div>
         )}
 
@@ -97,7 +87,7 @@ export const Auth: React.FC = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. mahirat23456@gmail.com"
+              placeholder="e.g. prasanthlakshmanan48@gmail.com"
               required
               autoFocus
             />
@@ -112,6 +102,7 @@ export const Auth: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={6}
                 style={{ width: "100%", paddingRight: "42px" }}
               />
               <button
@@ -130,43 +121,54 @@ export const Auth: React.FC = () => {
                 {showPassword ? "🙈" : "👁️"}
               </button>
             </div>
+            {isRegister && (
+              <span style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
+                Must be at least 6 characters
+              </span>
+            )}
           </div>
 
-          <button type="submit" className="btn-primary-teal" disabled={loading} style={{ width: "100%", justifyContent: "center", marginTop: "8px" }}>
-            {loading ? "Authenticating..." : isRegister ? "Register & Enter Portal" : "Sign In to System"}
+          <button 
+            type="submit" 
+            className="btn-primary-teal" 
+            disabled={loading} 
+            style={{ width: "100%", justifyContent: "center", marginTop: "10px" }}
+          >
+            {loading 
+              ? (isRegister ? "Creating Account..." : "Signing In...") 
+              : (isRegister ? "Register & Enter Portal" : "Sign In to System")}
           </button>
         </form>
 
-        {/* ONE-CLICK CLINICAL DEMO ACCESS */}
+        {/* 1-CLICK DEMO ACCESS (OPTIONAL) */}
         <div style={{
           marginTop: "16px",
-          padding: "12px",
-          background: "rgba(0, 196, 159, 0.08)",
-          border: "1px dashed rgba(0, 196, 159, 0.35)",
+          padding: "10px 14px",
+          background: "rgba(0, 196, 159, 0.05)",
+          border: "1px dashed rgba(0, 196, 159, 0.25)",
           borderRadius: "8px",
           textAlign: "center"
         }}>
-          <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "8px" }}>
-            ⚡ <strong>Instant Evaluation Access</strong> (Bypasses Firebase)
-          </div>
-          <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin(email || "prasanth@diabetesapp.com")}
-              style={{
-                background: "rgba(0, 196, 159, 0.2)",
-                color: "#00c49f",
-                border: "1px solid rgba(0, 196, 159, 0.4)",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                cursor: "pointer"
-              }}
-            >
-              🩺 Enter Demo Session
-            </button>
-          </div>
+          <span style={{ fontSize: "0.78rem", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+            Want to test without registering?
+          </span>
+          <button
+            type="button"
+            onClick={() => handleDemoLogin(email || "prasanth@diabetesapp.com")}
+            style={{
+              background: "rgba(0, 196, 159, 0.15)",
+              color: "#00c49f",
+              border: "1px solid rgba(0, 196, 159, 0.35)",
+              padding: "5px 12px",
+              borderRadius: "6px",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            ⚡ Instant Guest Evaluation Access
+          </button>
         </div>
 
         <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #1a2744", fontSize: "0.9rem", color: "#94a3b8" }}>
@@ -175,7 +177,7 @@ export const Auth: React.FC = () => {
               Already have an account?{" "}
               <button
                 type="button"
-                onClick={() => { setIsRegister(false); setError(null); setShowDemoPrompt(false); }}
+                onClick={() => { setIsRegister(false); setError(null); }}
                 style={{ background: "none", border: "none", color: "#00c49f", fontWeight: 700, cursor: "pointer" }}
               >
                 Sign In
@@ -186,7 +188,7 @@ export const Auth: React.FC = () => {
               Need a new account?{" "}
               <button
                 type="button"
-                onClick={() => { setIsRegister(true); setError(null); setShowDemoPrompt(false); }}
+                onClick={() => { setIsRegister(true); setError(null); }}
                 style={{ background: "none", border: "none", color: "#00c49f", fontWeight: 700, cursor: "pointer" }}
               >
                 Register Here

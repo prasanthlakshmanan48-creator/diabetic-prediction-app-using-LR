@@ -4,8 +4,7 @@ import {
   signInWithEmailAndPassword as fbSignIn, 
   createUserWithEmailAndPassword as fbCreateUser, 
   signOut as fbSignOut,
-  onAuthStateChanged as fbOnAuthStateChanged,
-  User as FirebaseUser
+  onAuthStateChanged as fbOnAuthStateChanged
 } from "firebase/auth";
 
 // Public credentials safe to include in frontend
@@ -32,6 +31,41 @@ export type User = AppUser;
 
 // Listeners for auth state changes
 const authListeners = new Set<(user: AppUser | null) => void>();
+
+export function setAuthenticatedSession(token: string, user: { uid: string; email: string; name?: string }): AppUser {
+  const sessionData = {
+    token,
+    uid: user.uid,
+    email: user.email,
+    displayName: user.name || user.email.split("@")[0] || "User",
+  };
+  localStorage.setItem("diabetes_auth_session", JSON.stringify(sessionData));
+  const fullUser: AppUser = {
+    uid: sessionData.uid,
+    email: sessionData.email,
+    displayName: sessionData.displayName,
+    getIdToken: async () => token,
+  };
+  authListeners.forEach((cb) => cb(fullUser));
+  return fullUser;
+}
+
+export function getActiveSessionUser(): AppUser | null {
+  try {
+    const raw = localStorage.getItem("diabetes_auth_session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.token || !parsed.uid) return null;
+    return {
+      uid: parsed.uid,
+      email: parsed.email || null,
+      displayName: parsed.displayName || "User",
+      getIdToken: async () => parsed.token,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function getDemoUser(): AppUser | null {
   try {
@@ -72,6 +106,8 @@ export function loginWithDemo(email: string): AppUser {
 }
 
 export function getCurrentUser(): AppUser | null {
+  const sessionUser = getActiveSessionUser();
+  if (sessionUser) return sessionUser;
   if (fbAuth.currentUser) {
     return fbAuth.currentUser as unknown as AppUser;
   }
@@ -82,7 +118,7 @@ export function getCurrentUser(): AppUser | null {
 export const auth: any = new Proxy(fbAuth, {
   get(target: any, prop: string | symbol, receiver: any) {
     if (prop === "currentUser") {
-      return target.currentUser || getDemoUser();
+      return getCurrentUser();
     }
     const val = Reflect.get(target, prop, receiver);
     if (typeof val === "function") {
@@ -96,6 +132,7 @@ export const signInWithEmailAndPassword = fbSignIn;
 export const createUserWithEmailAndPassword = fbCreateUser;
 
 export async function signOut(_authInstance?: any): Promise<void> {
+  localStorage.removeItem("diabetes_auth_session");
   localStorage.removeItem("diabetes_demo_user");
   try {
     await fbSignOut(fbAuth);
@@ -115,13 +152,12 @@ export function onAuthStateChanged(
     if (fbUser) {
       callback(fbUser as unknown as AppUser);
     } else {
-      callback(getDemoUser());
+      callback(getCurrentUser());
     }
   });
 
   // Emit current state immediately
-  const initial = fbAuth.currentUser ? (fbAuth.currentUser as unknown as AppUser) : getDemoUser();
-  callback(initial);
+  callback(getCurrentUser());
 
   return () => {
     authListeners.delete(callback);
