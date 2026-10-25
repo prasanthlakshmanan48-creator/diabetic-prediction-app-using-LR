@@ -157,9 +157,23 @@ app = FastAPI(
     version="2.0.0"
 )
 
+cors_env = os.environ.get("CORS_ORIGINS", "")
+allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+if not allowed_origins:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5000",
+        "https://diabetes-risk-frontend.onrender.com"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows React frontend hosted on Render or localhost
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

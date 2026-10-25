@@ -1,4 +1,4 @@
-import { auth } from "./firebase";
+import { auth, signOut } from "./firebase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -28,7 +28,7 @@ async function authFetch(endpoint: string, options: RequestInit = {}) {
 
   if (response.status === 401) {
     // Token expired or invalid
-    await auth.signOut();
+    await signOut();
     throw new Error("Session expired. Please log in again.");
   }
 

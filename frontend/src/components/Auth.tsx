@@ -1,15 +1,18 @@
 import React, { useState } from "react";
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
-} from "firebase/auth";
-import { auth } from "../firebase";
+  createUserWithEmailAndPassword,
+  auth,
+  loginWithDemo,
+  isFirebaseConfigured
+} from "../firebase";
 
 export const Auth: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showDemoPrompt, setShowDemoPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -17,18 +20,34 @@ export const Auth: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setShowDemoPrompt(false);
+
+    const trimmedEmail = email.trim();
 
     try {
       if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        await signInWithEmailAndPassword(auth, trimmedEmail, password);
       }
     } catch (err: any) {
-      setError(err.message || "Authentication failed. Please check your credentials.");
+      const msg = err.message || "";
+      const code = err.code || "";
+
+      if (code === "auth/api-key-not-valid" || msg.includes("api-key-not-valid") || msg.includes("invalid-api-key") || !isFirebaseConfigured()) {
+        setError("Firebase API Key is not configured yet. You can enter instantly using Clinical Demo Mode (no Firebase account required).");
+        setShowDemoPrompt(true);
+      } else {
+        setError(msg || "Authentication failed. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = (targetEmail?: string) => {
+    const userEmail = (targetEmail || email).trim() || "clinician@diabetesapp.local";
+    loginWithDemo(userEmail);
   };
 
   return (
@@ -43,8 +62,31 @@ export const Auth: React.FC = () => {
         </div>
 
         {error && (
-          <div className="alert-box alert-error">
-            {error}
+          <div className="alert-box alert-error" style={{ textAlign: "left" }}>
+            <div style={{ marginBottom: showDemoPrompt ? "10px" : "0" }}>{error}</div>
+            {showDemoPrompt && (
+              <button
+                type="button"
+                onClick={() => handleDemoLogin()}
+                style={{
+                  background: "#00c49f",
+                  color: "#080e1e",
+                  border: "none",
+                  padding: "8px 14px",
+                  borderRadius: "6px",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  width: "100%",
+                  justifyContent: "center"
+                }}
+              >
+                <span>🩺</span> Continue as {email || "Demo User"} (Clinical Demo Mode)
+              </button>
+            )}
           </div>
         )}
 
@@ -55,7 +97,7 @@ export const Auth: React.FC = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. prasanth@diabetesapp.com"
+              placeholder="e.g. mahirat23456@gmail.com"
               required
               autoFocus
             />
@@ -95,13 +137,45 @@ export const Auth: React.FC = () => {
           </button>
         </form>
 
-        <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #1a2744", fontSize: "0.9rem", color: "#94a3b8" }}>
+        {/* ONE-CLICK CLINICAL DEMO ACCESS */}
+        <div style={{
+          marginTop: "16px",
+          padding: "12px",
+          background: "rgba(0, 196, 159, 0.08)",
+          border: "1px dashed rgba(0, 196, 159, 0.35)",
+          borderRadius: "8px",
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "8px" }}>
+            ⚡ <strong>Instant Evaluation Access</strong> (Bypasses Firebase)
+          </div>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => handleDemoLogin(email || "prasanth@diabetesapp.com")}
+              style={{
+                background: "rgba(0, 196, 159, 0.2)",
+                color: "#00c49f",
+                border: "1px solid rgba(0, 196, 159, 0.4)",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+            >
+              🩺 Enter Demo Session
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #1a2744", fontSize: "0.9rem", color: "#94a3b8" }}>
           {isRegister ? (
             <>
               Already have an account?{" "}
               <button
                 type="button"
-                onClick={() => setIsRegister(false)}
+                onClick={() => { setIsRegister(false); setError(null); setShowDemoPrompt(false); }}
                 style={{ background: "none", border: "none", color: "#00c49f", fontWeight: 700, cursor: "pointer" }}
               >
                 Sign In
@@ -112,7 +186,7 @@ export const Auth: React.FC = () => {
               Need a new account?{" "}
               <button
                 type="button"
-                onClick={() => setIsRegister(true)}
+                onClick={() => { setIsRegister(true); setError(null); setShowDemoPrompt(false); }}
                 style={{ background: "none", border: "none", color: "#00c49f", fontWeight: 700, cursor: "pointer" }}
               >
                 Register Here

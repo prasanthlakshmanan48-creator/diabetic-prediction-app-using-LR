@@ -4,7 +4,7 @@ services:
   # -------------------------------------------------------------
   - type: web
     name: diabetes-risk-backend
-    env: python
+    runtime: python
     region: oregon
     plan: free
     buildCommand: "pip install -r requirements.txt"
@@ -26,7 +26,7 @@ services:
   # -------------------------------------------------------------
   - type: web
     name: diabetes-risk-frontend
-    env: static
+    runtime: static
     region: oregon
     plan: free
     rootDir: frontend

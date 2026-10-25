@@ -41,7 +41,19 @@ This guide outlines the complete step-by-step process for deploying the **FastAP
      - `appId`
    - Under **Project Settings** -> **Service Accounts** -> Click **Generate new private key** (downloads a `.json` file). Keep this file secret.
 
+> [!TIP]
+> **No Firebase setup? No problem!**
+> The system now includes **Instant Clinical Demo Mode**. If you do not have a Firebase project or omit Firebase credentials, the portal automatically allows instant evaluation access with user-specific data isolation (each user email gets their own private history and analytics records in SQLite/Postgres without triggering `auth/api-key-not-valid`).
+
 ---
+
+## 2.1 Troubleshooting: `Firebase: Error (auth/api-key-not-valid)`
+If you see the error:
+`Firebase: Error (auth/api-key-not-valid.-please-pass-a-valid-api-key.)`
+This means the frontend was accessed with a placeholder or invalid API key.
+- **Immediate Fix**: Click **"🩺 Continue as (Email) (Clinical Demo Mode)"** or the **"⚡ Enter Demo Session"** button on the login screen to enter the portal instantly.
+- **To use real Firebase Accounts**: Create a project in [Firebase Console](https://console.firebase.google.com/), obtain your Web API Key (`AIzaSy...`), and set `VITE_FIREBASE_API_KEY` in Render (under Environment Variables) or in your `.env` file.
+
 
 ## 3. Deploy Service 1: Python FastAPI Backend on Render
 
