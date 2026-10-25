@@ -1,47 +1,18 @@
 services:
-  # -------------------------------------------------------------
-  # 1. FastAPI Python Backend Service
-  # -------------------------------------------------------------
+  # =============================================================
+  # Diabetes Risk Prediction Full-Stack Web Application (Flask UI)
+  # =============================================================
   - type: web
-    name: diabetes-risk-backend
+    name: diabetes-risk-prediction
     runtime: python
     region: oregon
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    startCommand: "gunicorn app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
       - key: DATABASE_URL
         value: "sqlite:///instance/diabetes.db"
-      - key: CORS_ORIGINS
-        value: "https://diabetes-risk-frontend.onrender.com,http://localhost:3000,http://localhost:5000"
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
-        sync: false
-
-  # -------------------------------------------------------------
-  # 2. React Vite Frontend Service (Static Site)
-  # -------------------------------------------------------------
-  - type: web
-    name: diabetes-risk-frontend
-    runtime: static
-    region: oregon
-    plan: free
-    rootDir: frontend
-    buildCommand: "npm install && npm run build"
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_BASE_URL
-        value: "https://diabetes-risk-backend.onrender.com"
-      - key: VITE_FIREBASE_API_KEY
-        sync: false
-      - key: VITE_FIREBASE_AUTH_DOMAIN
-        sync: false
-      - key: VITE_FIREBASE_PROJECT_ID
-        sync: false
+      - key: SECRET_KEY
+        generateValue: true
