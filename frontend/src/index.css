@@ -133,7 +133,8 @@ body {
     font-weight: 700;
 }
 
-.btn-header-logout {
+.btn-header-logout,
+button.btn-header-logout {
     border: 1px solid var(--border-light);
     background: rgba(255, 255, 255, 0.03);
     color: var(--text-primary);
@@ -146,9 +147,12 @@ body {
     align-items: center;
     gap: 6px;
     transition: var(--transition);
+    cursor: pointer;
+    font-family: inherit;
 }
 
-.btn-header-logout:hover {
+.btn-header-logout:hover,
+button.btn-header-logout:hover {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.4);
     color: #f87171;
@@ -211,7 +215,8 @@ body {
     gap: 6px;
 }
 
-.nav-item {
+.nav-item,
+button.nav-item {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -223,14 +228,21 @@ body {
     font-weight: 600;
     transition: var(--transition);
     border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    width: 100%;
+    text-align: left;
 }
 
-.nav-item:hover {
+.nav-item:hover,
+button.nav-item:hover {
     color: var(--text-white);
     background: rgba(255, 255, 255, 0.04);
 }
 
-.nav-item.active {
+.nav-item.active,
+button.nav-item.active {
     color: var(--teal-primary);
     background: var(--teal-glow);
     border-color: var(--teal-border);
@@ -250,7 +262,8 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
-.btn-sidebar-logout {
+.btn-sidebar-logout,
+button.btn-sidebar-logout {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -263,9 +276,14 @@ body {
     font-weight: 600;
     transition: var(--transition);
     background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    font-family: inherit;
+    width: 100%;
+    text-align: left;
 }
 
-.btn-sidebar-logout:hover {
+.btn-sidebar-logout:hover,
+button.btn-sidebar-logout:hover {
     background: rgba(239, 68, 68, 0.1);
     color: #f87171;
     border-color: rgba(239, 68, 68, 0.3);
