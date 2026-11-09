@@ -16,8 +16,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
-from fastapi import FastAPI, Depends, HTTPException, Header, status
+from fastapi import FastAPI, Depends, HTTPException, Header, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -178,6 +179,33 @@ try:
 except Exception as e:
     print("Error loading ML Model in FastAPI:", e)
 
+# Fallback in case pickled model fails or is missing
+def ensure_ml_model():
+    global ml_model, ml_scaler
+    if ml_model is not None:
+        return
+    csv_path = os.path.join(BASE_DIR, "diabetes.csv")
+    if os.path.exists(csv_path):
+        try:
+            print("FastAPI: Training resilient fallback ML pipeline from diabetes.csv...")
+            from sklearn.pipeline import Pipeline
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.linear_model import LogisticRegression
+            df = pd.read_csv(csv_path)
+            X = df[FEATURES]
+            y = df["Outcome"]
+            pipeline = Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", LogisticRegression(max_iter=1000, random_state=42))
+            ])
+            pipeline.fit(X, y)
+            ml_model = pipeline
+            print("FastAPI: Fallback ML pipeline trained and active.")
+        except Exception as err:
+            print("FastAPI: Could not train fallback ML model:", err)
+
+ensure_ml_model()
+
 FEATURES = [
     "Pregnancies", "Glucose", "BloodPressure",
     "SkinThickness", "Insulin", "BMI",
@@ -201,21 +229,26 @@ DIABETIC_BENCHMARKS = {
 app = FastAPI(
     title="Diabetes Risk Prediction API - Biomedical Engineering",
     description="Secure, user-isolated patient prediction and clinical history API powered by FastAPI and Firebase Auth.",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 cors_env = os.environ.get("CORS_ORIGINS", "")
 allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
-if not allowed_origins:
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5000",
-        "https://diabetes-risk-frontend.onrender.com"
-    ]
+default_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5000",
+    "https://diabeticpredictapp-1f.onrender.com",
+    "https://diabeticpredictapp-1b.onrender.com",
+    "https://diabetes-risk-frontend.onrender.com",
+    "https://diabetes-risk-prediction.onrender.com"
+]
+for origin in default_origins:
+    if origin not in allowed_origins:
+        allowed_origins.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
@@ -429,13 +462,23 @@ def calculate_insights(glucose: float, bmi: float, bp: float) -> List[Dict[str, 
 # =========================================================
 
 @app.get("/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
+    db_ok = True
+    try:
+        db.query(UserAccount).first()
+    except Exception as err:
+        db_ok = False
+        print("Health check DB error:", err)
+
     return {
-        "status": "healthy",
+        "status": "healthy" if (ml_model is not None and db_ok) else "degraded",
         "service": "Diabetes Risk Prediction FastAPI",
+        "version": "2.1.0",
+        "database_connected": db_ok,
+        "model_loaded": ml_model is not None,
+        "scaler_loaded": ml_scaler is not None or (ml_model is not None and hasattr(ml_model, "named_steps")),
         "firebase_auth_active": FIREBASE_INIT,
-        "database": "SQLite (diabetes.db)",
-        "model_loaded": ml_model is not None
+        "timestamp": datetime.now().isoformat()
     }
 
 
@@ -748,13 +791,206 @@ def get_user_report(
     }
 
 
+# =========================================================
+# CLINICAL PDF REPORT GENERATOR
+# =========================================================
+
+def generate_pdf_report(record: PredictionRecord, insights: List[Dict[str, str]]) -> bytes:
+    """
+    Generates a professional, publication-grade Clinical Diabetes Assessment PDF.
+    """
+    buf = io.BytesIO()
+    with PdfPages(buf) as pdf:
+        fig = plt.figure(figsize=(8.5, 11), facecolor="white")
+
+        # 1. Top Header Banner
+        fig.text(0.5, 0.94, "CLINICAL DIABETES RISK ASSESSMENT REPORT", fontsize=15, fontweight="bold", ha="center", color="#0d172b")
+        fig.text(0.5, 0.915, "Biomedical Engineering Clinical Decision Support Platform", fontsize=10, ha="center", color="#475569")
+        fig.text(0.5, 0.90, "─" * 72, fontsize=9, ha="center", color="#cbd5e1")
+
+        # 2. Patient & Clinician Metadata Box
+        meta_left = (
+            f"Patient Identifier: {record.patient_name}\n"
+            f"Report Record ID:   #{record.id:05d}\n"
+            f"Evaluation Date:    {record.created_at}\n"
+            f"Clinician Account:  {record.username or record.user_uid}"
+        )
+        fig.text(0.10, 0.81, meta_left, fontsize=9.5, family="monospace", va="top", color="#1e293b", linespacing=1.45)
+
+        risk_color = "#dc2626" if record.probability >= 65.0 else ("#d97706" if record.probability >= 40.0 else "#059669")
+        meta_right = (
+            f"DIAGNOSTIC OUTCOME:    {record.prediction.upper()}\n"
+            f"Estimated Probability: {record.probability:.1f}%\n"
+            f"Machine Learning Model: Random Forest (Scikit-Learn)\n"
+            f"Privacy Security:      Isolated Account Workspace"
+        )
+        fig.text(0.52, 0.81, meta_right, fontsize=9.5, family="monospace", va="top", color=risk_color, fontweight="bold", linespacing=1.45)
+
+        fig.text(0.5, 0.725, "─" * 72, fontsize=9, ha="center", color="#cbd5e1")
+
+        # 3. Biometric Parameters Table
+        fig.text(0.10, 0.70, "PATIENT BIOMETRIC MEASUREMENTS & CLINICAL BENCHMARKS", fontsize=11, fontweight="bold", color="#0d172b")
+
+        table_rows = [
+            ["Biometric Parameter", "Patient Value", "Healthy Mean", "Diabetic Mean", "Clinical Status"],
+            ["Fasting Glucose", f"{record.glucose:.1f} mg/dL", "110.0 mg/dL", "141.3 mg/dL", "Optimal (<100)" if record.glucose < 100 else ("Prediabetes" if record.glucose <= 125 else "Elevated (≥126)")],
+            ["Diastolic Blood Pressure", f"{record.blood_pressure:.1f} mmHg", "68.2 mmHg", "70.8 mmHg", "Normal (<80)" if record.blood_pressure < 80 else "Elevated (≥80)"],
+            ["Body Mass Index (BMI)", f"{record.bmi:.1f} kg/m²", "30.3 kg/m²", "35.1 kg/m²", "Standard (<25)" if record.bmi < 25 else ("Overweight (25-30)" if record.bmi < 30 else "High (≥30)")],
+            ["Serum Insulin (2-Hour)", f"{record.insulin:.1f} μU/mL", "68.8 μU/mL", "100.3 μU/mL", "Normal" if record.insulin < 166 else "Elevated"],
+            ["Triceps Skin Fold", f"{record.skin_thickness:.1f} mm", "19.7 mm", "22.2 mm", "Normal"],
+            ["Pregnancies Count", f"{int(record.pregnancies)}", "3.3", "4.9", "N/A"],
+            ["Diabetes Pedigree Function", f"{record.diabetes_pedigree:.3f}", "0.430", "0.550", "Elevated" if record.diabetes_pedigree > 0.5 else "Standard"],
+            ["Patient Age", f"{int(record.age)} years", "31.2 years", "37.1 years", "N/A"],
+        ]
+
+        ax_tab = fig.add_axes([0.10, 0.44, 0.80, 0.24])
+        ax_tab.axis("off")
+        tab = ax_tab.table(
+            cellText=table_rows,
+            cellLoc="left",
+            loc="center",
+            colWidths=[0.30, 0.18, 0.18, 0.18, 0.16]
+        )
+        tab.auto_set_font_size(False)
+        tab.set_fontsize(8.5)
+        tab.scale(1, 1.35)
+
+        for c in range(5):
+            tab[(0, c)].set_facecolor("#0f172a")
+            tab[(0, c)].set_text_props(color="white", fontweight="bold")
+        for r_idx in range(1, len(table_rows)):
+            bg = "#f8fafc" if r_idx % 2 == 0 else "#ffffff"
+            for c in range(5):
+                tab[(r_idx, c)].set_facecolor(bg)
+
+        # 4. Clinical Insights & Next Steps
+        fig.text(0.10, 0.395, "DIAGNOSTIC FINDINGS & CLINICAL RECOMMENDATIONS", fontsize=11, fontweight="bold", color="#0d172b")
+
+        insights_bullets = []
+        for ins in insights:
+            insights_bullets.append(f"• [{ins.get('title', 'Clinical Finding')}]: {ins.get('message', '')}")
+        if not insights_bullets:
+            insights_bullets.append("• Biometric indicators evaluated within normal clinical tolerance thresholds.")
+            insights_bullets.append("• Maintain regular physical activity, balanced glycemic index nutrition, and annual health screenings.")
+        else:
+            insights_bullets.append("• Recommended follow-up: Fasting plasma glucose and comprehensive metabolic panel (CMP).")
+            insights_bullets.append("• Consult primary care physician or certified endocrinologist for clinical correlation.")
+
+        fig.text(0.10, 0.365, "\n".join(insights_bullets), fontsize=8.5, color="#334155", va="top", linespacing=1.55)
+
+        # 5. Doctor Signature & Verification Footer
+        fig.text(0.10, 0.12, "Examining Clinician: ________________________", fontsize=9, color="#475569")
+        fig.text(0.60, 0.12, "Authorized Signature: ________________________", fontsize=9, color="#475569")
+        fig.text(0.50, 0.05, "CONFIDENTIAL CLINICAL REPORT • GENERATED BY DIABETES RISK PREDICTION SYSTEM", fontsize=7.5, color="#94a3b8", ha="center")
+
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+    buf.seek(0)
+    return buf.getvalue()
+
+
+# =========================================================
+# PDF REPORT & RECORD MANAGEMENT ENDPOINTS
+# =========================================================
+
+@app.get("/api/reports/{report_id}/pdf")
+@app.get("/reports/{report_id}/pdf")
+def download_patient_report_pdf(
+    report_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generates and downloads a clean, publication-grade patient clinical PDF report."""
+    record = db.query(PredictionRecord).filter(PredictionRecord.id == report_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Assessment report not found.")
+    if record.user_uid != current_user["uid"]:
+        raise HTTPException(status_code=403, detail="Access forbidden: You cannot download another user's report.")
+
+    insights = []
+    if record.report_details:
+        try:
+            insights = json.loads(record.report_details)
+        except Exception:
+            pass
+    if not insights:
+        insights = calculate_insights(record.glucose, record.bmi, record.blood_pressure)
+
+    pdf_bytes = generate_pdf_report(record, insights)
+    clean_name = (record.patient_name or "patient").replace(" ", "_").replace("#", "")
+    filename = f"diabetes_report_{clean_name}_{record.id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
+@app.delete("/api/history/{record_id}")
+@app.delete("/api/predictions/{record_id}")
+@app.delete("/predictions/{record_id}")
+def delete_prediction(
+    record_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Deletes a patient prediction record strictly owned by the authenticated user."""
+    record = db.query(PredictionRecord).filter(PredictionRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Prediction record not found.")
+    if record.user_uid != current_user["uid"]:
+        raise HTTPException(status_code=403, detail="Access forbidden: You cannot delete another user's record.")
+
+    db.delete(record)
+    db.commit()
+    return {"message": "Prediction deleted successfully.", "id": record_id}
+
+
+# Route aliases for /predictions to support both REST conventions
+@app.post("/predictions")
+@app.post("/api/predictions")
+def create_prediction_alias(
+    req: PredictionRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return create_prediction(req, current_user, db)
+
+
+@app.get("/predictions")
+@app.get("/api/predictions")
+def get_predictions_alias(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_user_history(current_user, db)
+
+
+@app.get("/predictions/{prediction_id}")
+@app.get("/api/predictions/{prediction_id}")
+def get_prediction_detail_alias(
+    prediction_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_user_report(prediction_id, current_user, db)
+
+
+# =========================================================
+# ENHANCED DASHBOARD ENDPOINT
+# =========================================================
+
 @app.get("/api/dashboard")
 def get_user_dashboard(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Returns personal dashboard metrics and latest prediction
+    Returns personal dashboard metrics, risk distribution, and trends
     strictly for the authenticated user.
     """
     user_uid = current_user["uid"]
@@ -764,6 +1000,10 @@ def get_user_dashboard(
     ).order_by(PredictionRecord.id.desc()).all()
 
     total_checks = len(records)
+    high_risk_count = sum(1 for r in records if (r.probability or 0) >= 65.0 or "High" in (r.prediction or ""))
+    medium_risk_count = sum(1 for r in records if (40.0 <= (r.probability or 0) < 65.0) or "Medium" in (r.prediction or ""))
+    low_risk_count = sum(1 for r in records if (r.probability or 0) < 40.0 or "Low" in (r.prediction or ""))
+
     if total_checks == 0:
         return {
             "user": {
@@ -772,9 +1012,14 @@ def get_user_dashboard(
                 "name": current_user.get("name")
             },
             "total_assessments": 0,
+            "high_risk_count": 0,
+            "medium_risk_count": 0,
+            "low_risk_count": 0,
             "average_risk": 0.0,
             "average_glucose": 0.0,
             "latest_prediction": None,
+            "recent_predictions": [],
+            "risk_distribution": {"High": 0, "Medium": 0, "Low": 0},
             "trend": {"labels": [], "probabilities": [], "glucoses": []},
             "message": "No prediction history available. Perform a prediction to see your analytics."
         }
@@ -788,6 +1033,19 @@ def get_user_dashboard(
     trend_probs = [round(r.probability, 1) for r in chronological]
     trend_glucoses = [round(r.glucose, 1) for r in chronological]
 
+    recent_predictions = [
+        {
+            "id": r.id,
+            "patient_name": r.patient_name,
+            "risk_category": r.prediction,
+            "probability": r.probability,
+            "date": r.created_at,
+            "glucose": r.glucose,
+            "bmi": r.bmi
+        }
+        for r in records[:5]
+    ]
+
     return {
         "user": {
             "uid": user_uid,
@@ -795,8 +1053,16 @@ def get_user_dashboard(
             "name": current_user.get("name")
         },
         "total_assessments": total_checks,
+        "high_risk_count": high_risk_count,
+        "medium_risk_count": medium_risk_count,
+        "low_risk_count": low_risk_count,
         "average_risk": avg_risk,
         "average_glucose": avg_glucose,
+        "risk_distribution": {
+            "High": high_risk_count,
+            "Medium": medium_risk_count,
+            "Low": low_risk_count
+        },
         "latest_prediction": {
             "id": latest.id,
             "patient_name": latest.patient_name,
@@ -804,6 +1070,7 @@ def get_user_dashboard(
             "probability": latest.probability,
             "date": latest.created_at
         },
+        "recent_predictions": recent_predictions,
         "trend": {
             "labels": trend_labels,
             "probabilities": trend_probs,

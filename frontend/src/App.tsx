@@ -152,7 +152,8 @@ export const App: React.FC = () => {
         {activeTab === "prediction" && (
           <PredictionForm onPredictionComplete={() => setActiveTab("history")} />
         )}
-        {(activeTab === "history" || activeTab === "reports") && <PredictionHistory />}
+        {activeTab === "history" && <PredictionHistory isReportsTab={false} />}
+        {activeTab === "reports" && <PredictionHistory isReportsTab={true} />}
         {activeTab === "settings" && (
           <div className="content-area">
             <div className="view-header">

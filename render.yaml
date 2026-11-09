@@ -1,14 +1,14 @@
 services:
   # =============================================================
-  # Diabetes Risk Prediction Full-Stack Web Application (Flask UI)
+  # 1. FastAPI Machine Learning API Backend
   # =============================================================
   - type: web
-    name: diabetes-risk-prediction
+    name: diabeticpredictapp-1b
     runtime: python
     region: oregon
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
@@ -16,3 +16,21 @@ services:
         value: "sqlite:///instance/diabetes.db"
       - key: SECRET_KEY
         generateValue: true
+      - key: CORS_ORIGINS
+        value: "https://diabeticpredictapp-1f.onrender.com,https://diabetes-risk-frontend.onrender.com"
+
+  # =============================================================
+  # 2. React + Vite Frontend Single Page Application
+  # =============================================================
+  - type: web
+    name: diabeticpredictapp-1f
+    runtime: static
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: "./frontend/dist"
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "https://diabeticpredictapp-1b.onrender.com"
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"

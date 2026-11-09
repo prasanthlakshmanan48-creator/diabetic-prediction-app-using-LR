@@ -65,9 +65,11 @@ export const PredictionForm: React.FC<PredictionFormProps> = ({ onPredictionComp
     try {
       const res = await api.predictDiabetes(formData);
       setResult(res);
-      if (onPredictionComplete) {
-        onPredictionComplete();
-      }
+      // Smooth scroll down to result
+      setTimeout(() => {
+        const el = document.getElementById("prediction-result-anchor");
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } catch (err: any) {
       setError(err.message || "Failed to process prediction.");
     } finally {
@@ -159,24 +161,135 @@ export const PredictionForm: React.FC<PredictionFormProps> = ({ onPredictionComp
       </div>
 
       {result && (
-        <div style={{ marginTop: "32px" }}>
-          <div style={{ background: "#0d172b", border: "1.5px solid " + (result.risk_category === "High Risk" ? "#ef4444" : "#00c49f"), borderRadius: "14px", padding: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-            <div>
-              <h3 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#ffffff" }}>{result.risk_category}</h3>
-              <p style={{ color: "#94a3b8" }}>Recorded strictly in your private patient history.</p>
-            </div>
-            <div style={{ background: "#080e1e", padding: "12px 24px", borderRadius: "10px", textAlign: "right" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Calculated Probability</div>
-              <div style={{ fontSize: "2rem", fontWeight: 800, color: result.probability >= 70 ? "#ef4444" : "#00c49f" }}>
-                {result.probability}%
+        <div id="prediction-result-anchor" style={{ marginTop: "36px", animation: "fadeIn 0.3s ease-in-out" }}>
+          <div
+            style={{
+              background: "#0d172b",
+              border: "1.5px solid " + (result.risk_category === "High Risk" ? "#ef4444" : result.risk_category === "Medium Risk" ? "#f59e0b" : "#00c49f"),
+              borderRadius: "16px",
+              padding: "26px",
+              marginBottom: "24px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", borderBottom: "1px solid #1a2744", paddingBottom: "18px", marginBottom: "18px" }}>
+              <div>
+                <div style={{ fontSize: "0.82rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>
+                  Assessment Outcome for: <span style={{ color: "#ffffff" }}>{result.patient_name || formData.patient_name}</span>
+                </div>
+                <h3 style={{ fontSize: "1.8rem", fontWeight: 800, color: result.risk_category === "High Risk" ? "#ef4444" : result.risk_category === "Medium Risk" ? "#f59e0b" : "#00c49f", marginTop: "4px" }}>
+                  {result.risk_category}
+                </h3>
+                <p style={{ color: "#94a3b8", fontSize: "0.88rem", marginTop: "4px" }}>
+                  Assessed on <strong>{result.created_at || new Date().toLocaleString()}</strong> via {result.algorithm_used || "Random Forest Classifier"}
+                </p>
               </div>
+
+              <div style={{ background: "#080e1e", border: "1px solid #1a2744", padding: "14px 28px", borderRadius: "12px", textAlign: "right" }}>
+                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>Calculated Risk Probability</div>
+                <div style={{ fontSize: "2.4rem", fontWeight: 800, color: result.probability >= 65 ? "#ef4444" : result.probability >= 40 ? "#f59e0b" : "#00c49f" }}>
+                  {result.probability}%
+                </div>
+              </div>
+            </div>
+
+            {/* Input Biometrics Summary */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: "10px" }}>
+                Evaluated Clinical Biometrics
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Glucose</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.glucose} mg/dL</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Blood Pressure</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.blood_pressure} mmHg</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>BMI</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.bmi} kg/m²</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Serum Insulin</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.insulin} μU/mL</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Skin Fold</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.skin_thickness} mm</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Age</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.age} yrs</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Pedigree</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.diabetes_pedigree}</div>
+                </div>
+                <div style={{ background: "#080e1e", padding: "10px 14px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Pregnancies</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>{formData.pregnancies}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recommended Next Steps / Clinical Insights */}
+            {result.insights && result.insights.length > 0 && (
+              <div style={{ marginBottom: "22px" }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: "10px" }}>
+                  Recommended Next Steps & Clinical Findings
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {result.insights.map((ins: any, idx: number) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: "#080e1e",
+                        borderLeft: `4px solid ${ins.level === "high" ? "#ef4444" : ins.level === "warning" ? "#f59e0b" : "#00c49f"}`,
+                        padding: "10px 16px",
+                        borderRadius: "0 8px 8px 0",
+                      }}
+                    >
+                      <strong style={{ color: "#ffffff", fontSize: "0.9rem" }}>{ins.title}: </strong>
+                      <span style={{ color: "#94a3b8", fontSize: "0.88rem" }}>{ins.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "flex-end", marginTop: "14px" }}>
+              <button
+                type="button"
+                className="btn-chip"
+                onClick={() => {
+                  if (result.id) {
+                    api.downloadReportPdf(result.id, result.patient_name || formData.patient_name);
+                  }
+                }}
+                style={{ background: "#10b981", color: "#ffffff", fontWeight: 600, padding: "10px 20px" }}
+              >
+                📥 Download PDF Clinical Report
+              </button>
+
+              {onPredictionComplete && (
+                <button
+                  type="button"
+                  className="btn-chip"
+                  onClick={onPredictionComplete}
+                  style={{ background: "#3b82f6", color: "#ffffff", fontWeight: 600, padding: "10px 20px" }}
+                >
+                  🕒 View in History & Reports
+                </button>
+              )}
             </div>
           </div>
 
           {result.graph_base64 && (
             <div className="matplotlib-panel">
               <h4 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#ffffff", marginBottom: "14px" }}>
-                📈 Publication Diagnostic Graphic (Matplotlib Engine)
+                📈 Publication Diagnostic Graphic (Matplotlib Clinical Engine)
               </h4>
               <div className="matplotlib-img-wrap">
                 <img src={`data:image/png;base64,${result.graph_base64}`} alt="Diagnostic Assessment Chart" />

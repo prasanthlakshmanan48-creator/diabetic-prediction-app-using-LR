@@ -17,7 +17,11 @@ interface HistoryRecord {
   algorithm_used: string;
 }
 
-export const PredictionHistory: React.FC = () => {
+interface PredictionHistoryProps {
+  isReportsTab?: boolean;
+}
+
+export const PredictionHistory: React.FC<PredictionHistoryProps> = ({ isReportsTab = false }) => {
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +55,17 @@ export const PredictionHistory: React.FC = () => {
     }
   };
 
+  const handleDelete = async (recordId: number) => {
+    if (!window.confirm("Are you sure you want to delete this patient prediction record?")) return;
+    try {
+      await api.deletePrediction(recordId);
+      setHistory((prev) => prev.filter((r) => r.id !== recordId));
+      if (selectedReport?.id === recordId) setSelectedReport(null);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete prediction record.");
+    }
+  };
+
   const filteredRecords = history.filter((record) => {
     const matchesSearch = record.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRisk = riskFilter === "ALL" || record.risk_level.includes(riskFilter);
@@ -61,10 +76,14 @@ export const PredictionHistory: React.FC = () => {
     <div className="content-area">
       <div className="view-header">
         <h2 className="view-title">
-          <span style={{ color: "#00c49f" }}>🕒</span>
-          <span>Prediction History</span>
+          <span style={{ color: "#00c49f" }}>{isReportsTab ? "📄" : "🕒"}</span>
+          <span>{isReportsTab ? "Clinical Diagnostic Reports & Records" : "Prediction History"}</span>
         </h2>
-        <p className="view-subtitle">Private assessment history associated with your authenticated account.</p>
+        <p className="view-subtitle">
+          {isReportsTab
+            ? "Review patient assessment records, inspect clinical biometrics, and download authenticated PDF reports."
+            : "Private assessment history associated with your authenticated account."}
+        </p>
       </div>
 
       {/* FILTER & SEARCH BAR */}
@@ -102,8 +121,29 @@ export const PredictionHistory: React.FC = () => {
       )}
 
       {error && (
-        <div className="alert-box alert-error" style={{ marginBottom: "20px" }}>
-          <span>{error}</span>
+        <div className="alert-box alert-error" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
+          <div>
+            <strong>System Connection Status:</strong> {error}
+          </div>
+          <button
+            type="button"
+            onClick={loadUserHistory}
+            style={{
+              background: "#00c49f",
+              color: "#080e1e",
+              border: "none",
+              padding: "6px 16px",
+              borderRadius: "6px",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            🔄 Retry Connection
+          </button>
         </div>
       )}
 
@@ -143,14 +183,35 @@ export const PredictionHistory: React.FC = () => {
                       <td style={{ fontWeight: 700, color: "#ffffff" }}>{item.probability}</td>
                       <td className="comparison-text">{item.historical_comparison}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="action-link"
-                          style={{ background: "none", border: "none", cursor: "pointer" }}
-                          onClick={() => openReport(item.id)}
-                        >
-                          <span>📄 View Report</span>
-                        </button>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <button
+                            type="button"
+                            className="action-link"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#38bdf8" }}
+                            onClick={() => openReport(item.id)}
+                            title="View Clinical Report"
+                          >
+                            <span>📄 View</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="action-link"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#10b981" }}
+                            onClick={() => api.downloadReportPdf(item.id, item.patient_name)}
+                            title="Download Clinical PDF"
+                          >
+                            <span>📥 PDF</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="action-link"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}
+                            onClick={() => handleDelete(item.id)}
+                            title="Delete Record"
+                          >
+                            <span>🗑</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -260,14 +321,34 @@ export const PredictionHistory: React.FC = () => {
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
               <button
+                type="button"
                 className="btn-chip"
-                onClick={() => setSelectedReport(null)}
-                style={{ padding: "8px 18px" }}
+                onClick={() => handleDelete(selectedReport.id)}
+                style={{ background: "rgba(239, 68, 68, 0.15)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.4)", padding: "8px 16px" }}
               >
-                Close
+                🗑 Delete Record
               </button>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn-chip"
+                  onClick={() => api.downloadReportPdf(selectedReport.id, selectedReport.patient_name)}
+                  style={{ background: "#10b981", color: "#ffffff", padding: "8px 18px", fontWeight: 600 }}
+                >
+                  📥 Download PDF
+                </button>
+                <button
+                  type="button"
+                  className="btn-chip"
+                  onClick={() => setSelectedReport(null)}
+                  style={{ padding: "8px 18px" }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
