@@ -1,11 +1,12 @@
 import { auth, signOut } from "./firebase";
 
-const PROD_API_URL = "https://diabeticpredictapp-1b.onrender.com";
+const PROD_API_URL = "https://diabetic-prediction-app-using-lr-1.onrender.com";
 
 // Dynamically determine candidate API URLs
 const getCandidateUrls = (): string[] => {
   if (import.meta.env.VITE_API_BASE_URL) {
-    return [import.meta.env.VITE_API_BASE_URL.replace(/\/$/, "")];
+    const customUrl = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, "");
+    return [customUrl, PROD_API_URL];
   }
   const isLocal =
     typeof window !== "undefined" &&
@@ -16,7 +17,7 @@ const getCandidateUrls = (): string[] => {
     // When developing locally, prefer local backend (port 8000), fallback to Render cloud
     return ["http://localhost:8000", PROD_API_URL];
   }
-  return [PROD_API_URL];
+  return [PROD_API_URL, "https://diabeticpredictapp-1b.onrender.com"];
 };
 
 let activeBaseUrl = getCandidateUrls()[0];

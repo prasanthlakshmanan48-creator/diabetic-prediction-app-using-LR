@@ -461,6 +461,17 @@ def calculate_insights(glucose: float, bmi: float, bp: float) -> List[Dict[str, 
 # API ROUTES: SECURE USER ISOLATION
 # =========================================================
 
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "Diabetes Risk Prediction FastAPI Backend",
+        "version": "2.1.0",
+        "docs_url": "/docs",
+        "health_check": "/health",
+        "message": "Clinical Biomedical Machine Learning API is actively running."
+    }
+
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     db_ok = True

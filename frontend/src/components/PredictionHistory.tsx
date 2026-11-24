@@ -169,13 +169,12 @@ export const PredictionHistory: React.FC<PredictionHistoryProps> = ({ isReportsT
                       <td style={{ color: "#94a3b8", fontSize: "0.88rem" }}>{item.date}</td>
                       <td>
                         <span
-                          className={`risk-pill ${
-                            item.risk_level.includes("High")
+                          className={`risk-pill ${item.risk_level.includes("High")
                               ? "high"
                               : item.risk_level.includes("Low")
-                              ? "low"
-                              : "medium"
-                          }`}
+                                ? "low"
+                                : "medium"
+                            }`}
                         >
                           {item.risk_level}
                         </span>
